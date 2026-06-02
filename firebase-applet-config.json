@@ -1,0 +1,10 @@
+{
+  "projectId": "admission-2",
+  "appId": "1:82716363748:web:4590e369bf14ea6960d5f1",
+  "apiKey": "AIzaSyBZn-BBlAl9GCF-u2ILN6VxNfkBBjUzuJs",
+  "authDomain": "admission-2.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-fadbd2ca-e7cd-4368-a537-e43cfac5247f",
+  "storageBucket": "admission-2.firebasestorage.app",
+  "messagingSenderId": "82716363748",
+  "measurementId": "G-VM8E6F0FPF"
+}

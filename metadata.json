@@ -1,0 +1,6 @@
+{
+  "name": "ShiftWise Namibia",
+  "description": "Professional shift roster and payroll management system custom-built for Namibian industries.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

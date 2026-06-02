@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "A company account using ShiftWise Namibia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "logo_url": { "type": "string" },
+        "plan": { "type": "string", "enum": ["starter", "business", "enterprise"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "plan"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A supervisor or admin user associated with a company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "company_id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "supervisor", "employee"] },
+        "phone": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "company_id", "email", "role"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "An employee / guard managed by a company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "company_id": { "type": "string" },
+        "name": { "type": "string" },
+        "badge": { "type": "string" },
+        "role": { "type": "string", "enum": ["Guard", "Supervisor", "Team Leader", "Control Room", "Armed Response", "K9 Handler"] },
+        "site_id": { "type": "string" },
+        "hourly_rate": { "type": "number" },
+        "photo_url": { "type": "string" },
+        "phone": { "type": "string" },
+        "id_number": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "company_id", "name", "role", "hourly_rate"]
+    },
+    "Site": {
+      "title": "Site",
+      "description": "A work site / location",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "company_id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "company_id", "name"]
+    },
+    "Roster": {
+      "title": "Roster",
+      "description": "A monthly roster record containing shift assignments for an employee",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employee_id": { "type": "string" },
+        "company_id": { "type": "string" },
+        "month": { "type": "string" },
+        "shifts": { "type": "object" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "employee_id", "company_id", "month", "shifts"]
+    },
+    "PayrollSettings": {
+      "title": "PayrollSettings",
+      "description": "Payroll configurations for a company",
+      "type": "object",
+      "properties": {
+        "company_id": { "type": "string" },
+        "night_allowance": { "type": "number" },
+        "ot_rate": { "type": "number" },
+        "ot_threshold": { "type": "number" },
+        "ph_bonus": { "type": "number" }
+      },
+      "required": ["company_id"]
+    }
+  },
+  "firestore": {
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Companies registration data"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Users profile and authentication mapping"
+    },
+    "/companies/{companyId}/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Employees of a specific company"
+    },
+    "/companies/{companyId}/sites/{siteId}": {
+      "schema": "Site",
+      "description": "Sites of a specific company"
+    },
+    "/companies/{companyId}/roster/{rosterId}": {
+      "schema": "Roster",
+      "description": "Rosters of a specific company, partitioned by month"
+    },
+    "/companies/{companyId}/payroll_settings/default": {
+      "schema": "PayrollSettings",
+      "description": "Payroll settings for a specific company"
+    }
+  }
+}
