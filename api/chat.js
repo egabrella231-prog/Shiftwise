@@ -1,58 +1,52 @@
-import express from "express";
-import path from "path";
-import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-dotenv.config();
+export default async function handler(req, res) {
+  // CORS support
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-const app = express();
-const PORT = 3000;
+  // Handle preflight OPTIONS request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+  // GET handler for simple health checking
+  if (req.method === "GET") {
+    return res.status(200).json({ status: "active", message: "ShiftWise Namibia AI Assistant endpoint is ready." });
+  }
 
-// Lazy-initialized Gemini client
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient() {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not defined in environment variables.");
+  // Restrict to POST
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Only POST requests are supported." });
+  }
+
+  // Retrieve process-level Gemini API Key
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "" || apiKey === "YOUR_API_KEY") {
+    return res.status(200).json({
+      reply: "Awe my friend! 🇳🇦 To activate my AI brain, please go to the Settings menu (top right gears icon of Google AI Studio or your Vercel project environment variables) and configure your `GEMINI_API_KEY` secret. Once you save it, I can help you draft schedules and answer questions instantly! Sharp sharp!",
+      actions: []
+    });
+  }
+
+  try {
+    const { message, currentMonth, employees, rosterState } = req.body || {};
+
+    if (!message) {
+      return res.status(400).json({ error: "Missing required 'message' field in body." });
     }
-    aiClient = new GoogleGenAI({
-      apiKey: apiKey || "MOCK_KEY",
+
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
         }
       }
     });
-  }
-  return aiClient;
-}
 
-// REST API endpoint: AI Roster Assistant (handles both /api/chat and /api/gemini/roster-assistant)
-app.post(["/api/chat", "/api/gemini/roster-assistant"], async (req, res) => {
-  try {
-    const { message, rosterState, month, currentMonth, employees } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Message is required" });
-    }
-
-    // Proactive check for GEMINI_API_KEY secret
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "" || apiKey === "YOUR_API_KEY") {
-      return res.json({
-        reply: "Awe my friend! 🇳🇦 To activate my AI brain, please go to the Settings menu (top right gears icon of Google AI Studio) and configure your `GEMINI_API_KEY` secret. Once you save it, I can help you draft schedules and answer questions instantly! Sharp sharp!",
-        actions: []
-      });
-    }
-
-    const selectedMonth = month || currentMonth;
-
-    const ai = getGeminiClient();
+    const selectedMonth = currentMonth || "Current Month";
     const systemInstruction = `
 You are the "ShiftWise Namibia AI Roster Assistant" representing Namibia's top shift scheduling system.
 You speak in friendly Namibian English (use colloquial terms occasionally like "Awe!", "sharp sharp", "lekker", "my friend", "Namibia", "how is it?").
@@ -77,7 +71,7 @@ Roster Action Schema Definitions:
    - shiftType: string ("D", "N", "O", "X")
 
 Answer requirements:
-Always provide a JSON response mapping strictly to our response schema:
+Always provide a JSON response mapping strictly to our response schema. Avoid structural markup or extra formatting outside the JSON:
 {
   "reply": "friendly Namibian greeting and explanation of what was changed, including answers to questions",
   "actions": Array of actions to execute
@@ -93,37 +87,37 @@ If multiple employees have similar names (e.g., Samuel vs Maria), match them cor
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: "OBJECT",
           properties: {
             reply: {
-              type: Type.STRING,
+              type: "STRING",
               description: "The friendly conversational response in Namibian English."
             },
             actions: {
-              type: Type.ARRAY,
+              type: "ARRAY",
               description: "Array of structured roster commands to feed back to the frontend roster.",
               items: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
                   type: {
-                    type: Type.STRING,
+                    type: "STRING",
                     description: "Action type: 'set_shift', 'auto_fill', 'clear_all', 'clear_employee', 'set_day_of_week'"
                   },
                   employeeId: {
-                    type: Type.STRING,
+                    type: "STRING",
                     description: "Employee ID to lock/apply shift."
                   },
                   days: {
-                    type: Type.ARRAY,
+                    type: "ARRAY",
                     description: "Days of month (e.g. [1, 2, 3, 4, 5, 6, 7]) for setting shift.",
-                    items: { type: Type.INTEGER }
+                    items: { type: "INTEGER" }
                   },
                   shiftType: {
-                    type: Type.STRING,
+                    type: "STRING",
                     description: "Shift type: 'D', 'N', 'O', 'X', 'PH'"
                   },
                   dayOfWeek: {
-                    type: Type.STRING,
+                    type: "STRING",
                     description: "Day of week: 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'"
                   }
                 },
@@ -138,16 +132,15 @@ If multiple employees have similar names (e.g., Samuel vs Maria), match them cor
 
     const text = response.text || "{}";
     const resultJson = JSON.parse(text);
-    return res.json(resultJson);
+    return res.status(200).json(resultJson);
 
   } catch (error) {
-    console.error("Roster AI Assistant Error:", error);
+    console.error("Gemini API Serverless Error:", error);
     const apiErrorMessage = error instanceof Error ? error.message : String(error);
-    
-    // Check for common issues like invalid key, quota, etc.
+
     let userFriendlySuggestion = "Sorry lekker friend, I ran into an issue communicating with my brain.";
     if (apiErrorMessage.toLowerCase().includes("key") || apiErrorMessage.toLowerCase().includes("api")) {
-      userFriendlySuggestion = "It looks like there might be an issue with your `GEMINI_API_KEY` secret. Please verify that it is correctly copied in the Settings menu (gears icon in the top right of Google AI Studio) and has no extra spaces. Sharp sharp!";
+      userFriendlySuggestion = "It looks like there might be an issue with your `GEMINI_API_KEY` secret. Please verify that it is correctly configured in your deployment settings and has no extra spaces. Sharp sharp!";
     } else if (apiErrorMessage.toLowerCase().includes("quota") || apiErrorMessage.toLowerCase().includes("exhausted") || apiErrorMessage.toLowerCase().includes("rate limit")) {
       userFriendlySuggestion = "My brain's free quota limit was reached. Please wait a minute before sending your request again! Sharp sharp!";
     }
@@ -157,27 +150,4 @@ If multiple employees have similar names (e.g., Samuel vs Maria), match them cor
       actions: []
     });
   }
-});
-
-// Serve frontend assets
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ShiftWise Namibia running on port ${PORT}`);
-  });
 }
-
-startServer();

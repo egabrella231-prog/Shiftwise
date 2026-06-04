@@ -190,8 +190,9 @@ export default function AIAssistant() {
         }
 
         const hostname = window.location.hostname;
-        // If checking from static deployment like Vercel, route back gracefully to Cloud Run backend Preview gateway
-        if (hostname.includes("vercel.app") || hostname.includes("github.io")) {
+        // If checking from GitHub pages or other external static hosts, route back gracefully to Cloud Run.
+        // For Vercel or localhost, use relative routes so they call their own serverless or Express handlers natively.
+        if (hostname.includes("github.io")) {
           return "https://ais-pre-wiep5afrjglchrlc3vop3z-675377096788.europe-west2.run.app";
         }
         return "";
@@ -200,7 +201,7 @@ export default function AIAssistant() {
       const apiBase = getApiBaseUrl();
 
       // Direct call to our backend API route
-      const response = await fetch(`${apiBase}/api/gemini/roster-assistant`, {
+      const response = await fetch(`${apiBase}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
