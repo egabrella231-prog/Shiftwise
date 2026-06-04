@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   SHIFTWISE NAMIBIA - PRINT & DASHBOARD ALIGNMENT OVERRIDES
+   Ensures WhatsApp images and PDF prints match the dashboard pixel-for-pixel.
+   ========================================================================== */
+
+@media print {
+  @page {
+    /* Force landscape mode to hold all 31 days side-by-side */
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force the roster container matrix to lock onto the desktop layout width */
+  #monthly-shift-scheduler-container,
+  .dashboard-container,
+  .matrix-table,
+  table {
+    width: 1510px !important; 
+    min-width: 1510px !important;
+    max-width: none !important;
+    table-layout: fixed !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Hide active UI elements, actions, and buttons from the layout output */
+  .no-print, 
+  button, 
+  .interactive-controls-bar, 
+  [role="button"],
+  .bg-blue-600, 
+  .bg-emerald-600,
+  a { 
+    display: none !important;
+  }
+
+  /* Retain high-contrast color pills for guard shift statuses on export */
+  [class*="status-d"], [class*="Day"] { 
+    background-color: #2563eb !important; 
+    color: #ffffff !important; 
+  } 
+  [class*="status-n"], [class*="Night"] { 
+    background-color: #1e3a8a !important; 
+    color: #ffffff !important; 
+  }
+  [class*="status-o"], [class*="Off"] { 
+    background-color: #f3f4f6 !important; 
+    color: #1f2937 !important; 
+  }
+  [class*="status-x"], [class*="Leave"], [class*="Sick"] { 
+    background-color: #fee2e2 !important; 
+    color: #dc2626 !important; 
+  }
+}

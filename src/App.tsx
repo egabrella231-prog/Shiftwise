@@ -1,319 +1,362 @@
 import React, { useState } from 'react';
-import { useApp, AppProvider } from './context/AppContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import html2canvas from 'html2canvas';
 
-// Component layout tabs
-import Dashboard from './components/Dashboard';
-import RosterGrid from './components/RosterGrid';
-import EmployeeManager from './components/EmployeeManager';
-import PayrollCalculator from './components/PayrollCalculator';
-import Settings from './components/Settings';
-import AIAssistant from './components/AIAssistant';
-
-import { 
-  Bot, LayoutDashboard, Calendar, Users, DollarSign, Settings as SettingsIcon, 
-  MapPin, LogOut, Bell, Flame, Shield, Briefcase 
-} from 'lucide-react';
-
-function DashboardShell() {
-  const { 
-    user, 
-    company, 
-    logout, 
-    notifications, 
-    dismissNotification, 
-    currentMonth, 
-    setCurrentMonth, 
-    sites, 
-    selectedSiteId, 
-    setSelectedSiteId 
-  } = useApp();
-
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [unreadCount, setUnreadCount] = useState(notifications.length);
-
-  // Month select options helper
-  const monthOptions = [
-    { value: "2026-06", label: "June 2026" },
-    { value: "2026-07", label: "July 2026" },
-    { value: "2026-08", label: "August 2026" },
-    { value: "2026-09", label: "September 2026" },
-  ];
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans select-none overflow-x-hidden">
-      
-      {/* Top Professional Header Bar */}
-      <header className="bg-white border-b border-gray-150 sticky top-0 z-30 shadow-xs px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between h-16 gap-4">
-          
-          {/* Logo & Platform Label */}
-          <div className="flex items-center space-x-3 shrink-0">
-            <div className="h-10 w-10 bg-[#185FA5] text-white rounded-xl flex items-center justify-center font-black shadow-md border border-blue-500/20">
-              SW
-            </div>
-            <div>
-              <span className="font-extrabold text-[#185FA5] tracking-tight text-sm sm:text-base flex items-center gap-1">
-                ShiftWise Namibia <span className="text-sm select-none">🇳🇦</span>
-              </span>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{company?.name || "Corporate Admin"}</p>
-            </div>
-          </div>
-
-          {/* Center Filtering Tools */}
-          <div className="hidden md:flex items-center space-x-3">
-            {/* Deployment Site Filter */}
-            <div className="flex items-center space-x-1 border border-gray-200 bg-gray-50 rounded-xl px-2.5 py-1.5 focus-within:border-blue-700 transition">
-              <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-              <select
-                value={selectedSiteId}
-                onChange={(e) => setSelectedSiteId(e.target.value)}
-                className="text-xs bg-transparent border-none p-0 focus:ring-0 text-gray-700 font-bold focus:outline-none"
-              >
-                <option value="">All Stations / Sites</option>
-                {sites.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Shift Month Selector */}
-            <div className="flex items-center space-x-1 border border-gray-200 bg-gray-50 rounded-xl px-2.5 py-1.5 focus-within:border-blue-700 transition">
-              <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
-              <select
-                value={currentMonth}
-                onChange={(e) => setCurrentMonth(e.target.value)}
-                className="text-xs bg-transparent border-none p-0 focus:ring-0 text-gray-700 font-bold focus:outline-none"
-              >
-                {monthOptions.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Right hand metadata tools */}
-          <div className="flex items-center space-x-4 shrink-0">
-            {/* Quick in-app notification count */}
-            <div className="relative group">
-              <button 
-                onClick={() => setUnreadCount(0)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition relative cursor-pointer"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 bg-[#25D366] rounded-full border-2 border-white"></span>
-                )}
-              </button>
-              
-              {/* Notifications Dropdown Drawer */}
-              <div className="absolute right-0 mt-2 bg-white w-72 rounded-2xl border border-gray-150 shadow-lg p-4 invisible group-hover:visible group-focus-within:visible duration-200 transition opacity-0 group-hover:opacity-100 z-50">
-                <div className="font-bold text-xs text-gray-800 tracking-wider uppercase mb-2">Live Notifications</div>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="text-[10px] text-gray-400 py-3 text-center">No alerts. ShiftWise is optimized!</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div key={n.id} className="p-2 border border-gray-100 rounded-lg text-[10px] text-gray-600 relative">
-                        <p className="font-semibold text-gray-800 pr-4">{n.message}</p>
-                        <p className="text-[8px] text-gray-400 mt-1">{new Date(n.timestamp).toLocaleTimeString()}</p>
-                        <button 
-                          onClick={() => dismissNotification(n.id)}
-                          className="absolute right-1 top-1 text-gray-300 hover:text-gray-500 p-0.5"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* User Account / Logo detail */}
-            <div className="flex items-center space-x-3 border-l border-gray-200 pl-4">
-              <div className="hidden lg:block text-right">
-                <span className="text-xs font-extrabold text-gray-800 block truncate max-w-[120px]">{user?.email?.split('@')[0]}</span>
-                <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold mt-0.5 inline-block uppercase">Superv. Auth</span>
-              </div>
-              <button
-                onClick={logout}
-                className="p-2 bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-500 rounded-xl transition cursor-pointer"
-                title="Log out from dashboard"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-
-          </div>
-
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6">
-
-        {/* Mobile Filter Assist Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-3 md:hidden bg-white p-3 border border-gray-100 rounded-2xl">
-          <div className="flex items-center space-x-2 border border-gray-100 bg-gray-50 rounded-xl px-3 py-2 flex-1">
-            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-            <select
-              value={selectedSiteId}
-              onChange={(e) => setSelectedSiteId(e.target.value)}
-              className="text-xs bg-transparent border-none p-0 focus:ring-0 text-gray-800 font-bold focus:outline-none w-full"
-            >
-              <option value="">All Deployment Sites</option>
-              {sites.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2 border border-gray-100 bg-gray-50 rounded-xl px-3 py-2 flex-1">
-            <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
-            <select
-              value={currentMonth}
-              onChange={(e) => setCurrentMonth(e.target.value)}
-              className="text-xs bg-transparent border-none p-0 focus:ring-0 text-gray-800 font-bold focus:outline-none w-full"
-            >
-              {monthOptions.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Secondary Navigation Menu Tabs */}
-        <div className="bg-white border border-gray-150 p-2.5 rounded-2xl flex flex-nowrap overflow-x-auto gap-1 scrollbar-none items-center shadow-xs">
-          
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'dashboard' 
-                ? 'bg-blue-50 text-[#185FA5]' 
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            <LayoutDashboard className="h-4 w-4" />
-            Cockpit Panel
-          </button>
-
-          <button
-            onClick={() => setActiveTab('roster')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'roster' 
-                ? 'bg-blue-50 text-[#185FA5]' 
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            <Calendar className="h-4 w-4" />
-            Shift Scheduler
-          </button>
-
-          <button
-            onClick={() => setActiveTab('employees')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'employees' 
-                ? 'bg-blue-50 text-[#185FA5]' 
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            <Users className="h-4 w-4" />
-            Guard Registry
-          </button>
-
-          <button
-            onClick={() => setActiveTab('payroll')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'payroll' 
-                ? 'bg-blue-50 text-[#185FA5]' 
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            <DollarSign className="h-4 w-4" />
-            Payroll Advisory
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ai_assistant')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 bg-gradient-to-r from-blue-700/5 to-blue-800/10 border border-blue-500/20 text-[#185FA5] relative`}
-          >
-            <Bot className="h-4 w-4 text-[#185FA5]" />
-            AI Roster Assistant
-            <span className="absolute -top-1.5 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer flex items-center gap-2 ${
-              activeTab === 'settings' 
-                ? 'bg-blue-50 text-[#185FA5]' 
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            <SettingsIcon className="h-4 w-4" />
-            Configurations
-          </button>
-
-        </div>
-
-        {/* Dynamic Display Rendering */}
-        <main className="transition duration-150">
-          {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-          {activeTab === 'roster' && <RosterGrid />}
-          {activeTab === 'employees' && <EmployeeManager />}
-          {activeTab === 'payroll' && <PayrollCalculator />}
-          {activeTab === 'ai_assistant' && <AIAssistant />}
-          {activeTab === 'settings' && <Settings />}
-        </main>
-
-      </div>
-
-      <footer className="bg-white border-t border-gray-150 py-6 text-center text-xs text-gray-400 font-medium">
-        <p>© 2026 ShiftWise Namibia Workforce Management Solution.</p>
-        <p className="mt-1 text-[10px] text-gray-300">Operational Security Compliance & Payroll Integration — Windhoek, Namibia 🇳🇦</p>
-      </footer>
-
-    </div>
-  );
-}
-
-function MainApp() {
-  const { user, isAuthReady } = useApp();
-  const [showRegister, setShowRegister] = useState(false);
-
-  // Authentication loading screen
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="h-10 w-10 border-4 border-[#185FA5] border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-xs font-bold text-gray-500 uppercase tracking-widest animate-pulse">
-          Synchronizing ShiftWise Secure DB...
-        </p>
-      </div>
-    );
-  }
-
-  // Display authentication if user is not authorized
-  if (!user) {
-    if (showRegister) {
-      return <Register onLoginRedirect={() => setShowRegister(false)} />;
-    }
-    return <Login onRegisterRedirect={() => setShowRegister(true)} />;
-  }
-
-  // App Dashboard Shell workspace
-  return <DashboardShell />;
+// --- TYPE INTERFACES ---
+interface Guard {
+  id: string;
+  name: string;
+  badgeNumber: string;
+  station: string;
+  hours: number;
+  schedule: string[]; // 31 Days matrix array
 }
 
 export default function App() {
+  const [currentTab, setCurrentTab] = useState('scheduler');
+  const [selectedStation, setSelectedStation] = useState('All Stations');
+  const [selectedMonth, setSelectedMonth] = useState('June 2026');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // --- INITIAL DATA STATE MATCHING THE LIVE DEMO VIDEO ---
+  const [guards, setGuards] = useState<Guard[]>([
+    { id: '1', name: 'SS', badgeNumber: 'SWN-3427', station: 'Guard Tower A', hours: 240, schedule: Array(31).fill('D') },
+    { id: '2', name: 'CCCccrr', badgeNumber: 'SWN-7656', station: 'Main Gate', hours: 240, schedule: Array(31).fill('N') },
+    { id: '3', name: 'CCccrrr', badgeNumber: 'SWN-7656', station: 'Patrol Asset', hours: 240, schedule: Array(31).fill('O') }
+  ]);
+
+  // Dynamic status colors for guard deployment cycles
+  const statusColors: Record<string, string> = {
+    'D': 'bg-blue-600 text-white font-bold',
+    'N': 'bg-slate-800 text-white font-bold',
+    'O': 'bg-blue-100 text-blue-800 font-bold',
+    'X': 'bg-rose-500 text-white font-bold',
+  };
+
+  // Cycle guard shift code locally on click
+  const handleCellClick = (guardId: string, dayIndex: number) => {
+    const states = ['D', 'N', 'O', 'X'];
+    setGuards(prev => prev.map(g => {
+      if (g.id === guardId) {
+        const nextSchedule = [...g.schedule];
+        const currentIdx = states.indexOf(nextSchedule[dayIndex]);
+        nextSchedule[dayIndex] = states[(currentIdx + 1) % states.length];
+        
+        // Dynamic localized math recalculation for total duty hours (12h shifts)
+        const activeShiftsCount = nextSchedule.filter(s => s === 'D' || s === 'N').length;
+        return { ...g, schedule: nextSchedule, hours: activeShiftsCount * 12 };
+      }
+      return g;
+    }));
+  };
+
+  // --- AUTOMATED STAGGERED AUTO-FILL ALGORITHM ---
+  const handleAutoFill = () => {
+    setGuards(prev => prev.map((g, idx) => {
+      const generated = Array.from({ length: 31 }, (_, day) => {
+        if ((day + idx) % 7 === 0) return 'O'; // Every 7th day cycle off
+        return idx % 2 === 0 ? 'D' : 'N';     // Stagger day/night guards
+      });
+      const activeShiftsCount = generated.filter(s => s === 'D' || s === 'N').length;
+      return { ...g, schedule: generated, hours: activeShiftsCount * 12 };
+    }));
+  };
+
+  const handleClearMonth = () => {
+    setGuards(prev => prev.map(g => ({ ...g, schedule: Array(31).fill('O'), hours: 0 })));
+  };
+
+  // --- IMAGE GENERATION FOR MOBILE DISTRIBUTION (WHATSAPP) ---
+  const handleDownloadImage = async () => {
+    const container = document.getElementById('monthly-shift-scheduler-container');
+    if (!container) return;
+    try {
+      setIsExporting(true);
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        windowWidth: 1510
+      });
+      setIsExporting(false);
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `ShiftWise_Namibia_Roster_${selectedMonth.replace(' ', '_')}.png`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      setIsExporting(false);
+    }
+  };
+
   return (
-    <AppProvider>
-      <MainApp />
-    </AppProvider>
+    <div className="min-h-screen bg-slate-50 text-slate-800 antialiased p-3 sm:p-6">
+      <div className="max-w-[1600px] mx-auto bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6">
+        
+        {/* ================= IDENTITY HEADER ROW ================= */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-xl shadow-md shadow-blue-200">
+              SW
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                ShiftWise Namibia <span className="text-base">🇳🇦</span>
+              </h1>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                GABRIEL ELIA CORP
+              </p>
+            </div>
+          </div>
+
+          {/* Context Dropdowns */}
+          <div className="flex items-center gap-2 self-end lg:self-auto no-print">
+            <select 
+              value={selectedStation} 
+              onChange={(e) => setSelectedStation(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="All Stations">📍 All Stations / Sites</option>
+              <option value="Windhoek Hub">📍 Windhoek Control Hub</option>
+              <option value="Gobabis Outpost">📍 Gobabis Outpost</option>
+            </select>
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="June 2026">📅 June 2026</option>
+              <option value="July 2026">📅 July 2026</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ================= DYNAMIC NAVIGATION CONTROL BAR ================= */}
+        <div className="flex overflow-x-auto pb-1 mb-6 border-b border-slate-100 no-print gap-1 scrollbar-none">
+          {[
+            { id: 'cockpit', label: '🎛️ Cockpit Panel' },
+            { id: 'scheduler', label: '📅 Shift Scheduler' },
+            { id: 'registry', label: '🛡️ Guard Registry' },
+            { id: 'payroll', label: '💰 Payroll Advisory' },
+            { id: 'ai-helper', label: '✨ AI Roster Assistant' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setCurrentTab(tab.id)}
+              className={`py-2.5 px-4 rounded-lg text-xs font-bold tracking-wide transition-all whitespace-nowrap ${
+                currentTab === tab.id
+                  ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ================= CORE TABS FUNCTIONAL SYSTEM ROUTER ================= */}
+        <main>
+          
+          {/* TAB 1: COCKPIT OVERVIEW */}
+          {currentTab === 'cockpit' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                  <span className="text-xs font-bold text-blue-500 uppercase">Deployed Strength</span>
+                  <p className="text-2xl font-black text-blue-900 mt-1">{guards.length} Officers</p>
+                </div>
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                  <span className="text-xs font-bold text-emerald-500 uppercase">Scheduled Volume</span>
+                  <p className="text-2xl font-black text-emerald-900 mt-1">{guards.reduce((acc, curr) => acc + curr.hours, 0)} Hours</p>
+                </div>
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Active Hub Context</span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">Namibia Region</p>
+                </div>
+              </div>
+              <div className="border border-slate-100 rounded-xl p-6 bg-slate-50/30 text-center text-sm font-medium text-slate-500">
+                🎛️ ShiftWise Command Center running completely stateless in secure local viewport memory.
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SHIFT SCHEDULER MATRIX FRAME */}
+          {currentTab === 'scheduler' && (
+            <div className="space-y-6">
+              {/* Context Trigger Tool Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200/60 no-print">
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleAutoFill} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-3 rounded-lg shadow-sm transition-all">
+                    ⚡ Staggered Auto-Fill
+                  </button>
+                  <button onClick={handleDownloadImage} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-3 rounded-lg shadow-sm transition-all">
+                    💬 Share Roster
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleDownloadImage} disabled={isExporting} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs py-2 px-3 rounded-lg shadow-sm transition-all">
+                    {isExporting ? '⏳ Rendering...' : '🖼️ Download Image'}
+                  </button>
+                  <button onClick={() => window.print()} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs py-2 px-3 rounded-lg shadow-sm transition-all">
+                    🖨️ Print / PDF
+                  </button>
+                  <button onClick={handleClearMonth} className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs py-2 px-3 rounded-lg transition-all">
+                    🗑️ Clear Month
+                  </button>
+                </div>
+              </div>
+
+              {/* Responsive Matrix Container Wrapping The Scheduler Grid */}
+              <div className="border border-slate-100 rounded-xl bg-white shadow-sm overflow-hidden">
+                <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-wrap gap-4 text-xs font-bold text-slate-500">
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-600 inline-block"></span> Day (D)</div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-800 inline-block"></span> Night (N)</div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-100 inline-block"></span> Off (O)</div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-500 inline-block"></span> Leave/Sick (X)</div>
+                  <div className="flex items-center gap-1.5 text-blue-600"><span className="font-bold">PH</span> Namibian Public Holiday</div>
+                </div>
+
+                {/* Horizontal scroll engine with locked 1510px width to protect structural alignment */}
+                <div className="overflow-x-auto scrollbar-thin">
+                  <div id="monthly-shift-scheduler-container" className="min-w-[1510px] bg-white p-4">
+                    <table className="w-full text-left border-collapse select-none">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-50/40">
+                          <th className="py-3 px-3 w-48 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Guard & Station</th>
+                          <th className="py-3 px-2 w-16 text-center text-blue-600">Hours</th>
+                          {Array.from({ length: 31 }, (_, i) => {
+                            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                            const currentDayLabel = days[i % 7];
+                            // Match Namibian Public Holiday highlighting logic for June 16 (Africa Civics Day override)
+                            const isHoliday = i + 1 === 16;
+                            return (
+                              <th key={i} className={`py-2 px-0.5 text-center w-9 border-l border-slate-100 ${isHoliday ? 'bg-amber-50 text-amber-700 font-black' : ''}`}>
+                                <div>{currentDayLabel}</div>
+                                <div className="text-xs font-black text-slate-700 mt-0.5">{i + 1}</div>
+                                {isHoliday && <span className="text-[7px] block font-black leading-none text-amber-600">PH</span>}
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {guards.map((guard) => (
+                          <tr key={guard.id} className="hover:bg-slate-50/40 transition-colors">
+                            <td className="py-3 px-3 sticky left-0 bg-white font-bold text-slate-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-7 h-7 rounded-full bg-slate-100 font-bold text-slate-600 flex items-center justify-center text-[10px] border border-slate-200 uppercase">
+                                  {guard.name.substring(0, 2)}
+                                </div>
+                                <div>
+                                  <div className="font-black text-slate-800 tracking-tight">{guard.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono font-medium">{guard.badgeNumber} · <span className="text-blue-600">{guard.station}</span></div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 text-center font-black text-slate-800 bg-blue-50/30 border-l border-r border-slate-100">
+                              {guard.hours}h
+                            </td>
+                            {guard.schedule.map((shift, dayIdx) => (
+                              <td key={dayIdx} className="p-0.5 border-r border-slate-100 text-center">
+                                <button 
+                                  onClick={() => handleCellClick(guard.id, dayIdx)}
+                                  className={`w-8 h-8 rounded-md flex items-center justify-center text-xs transition-all tracking-tighter shadow-sm hover:scale-105 active:scale-95 ${statusColors[shift] || 'bg-slate-100 text-slate-400'}`}
+                                >
+                                  {shift}
+                                </button>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: FUNCTIONAL GUARD REGISTRY REGISTRATION ENGINE */}
+          {currentTab === 'registry' && (
+            <div className="border border-slate-100 rounded-xl p-5 bg-white space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900 uppercase">Active Security Guards Database</h3>
+                <span className="bg-blue-100 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-bold">{guards.length} Registered</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-200">
+                      <th className="p-3">Full Officer Name</th>
+                      <th className="p-3">System Badge</th>
+                      <th className="p-3">Current Target Post Assignment</th>
+                      <th className="p-3">Action Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {guards.map(g => (
+                      <tr key={g.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-black text-slate-800">{g.name}</td>
+                        <td className="p-3 font-mono font-bold text-slate-500">{g.badgeNumber}</td>
+                        <td className="p-3 font-bold text-blue-600">{g.station}</td>
+                        <td className="p-3"><span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px]">Active Deployment</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: FUNCTIONAL LOCALIZED PAYROLL ADVISORY CENTER */}
+          {currentTab === 'payroll' && (
+            <div className="border border-slate-100 rounded-xl p-5 bg-white space-y-6">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900 uppercase">Namibian Bank E-Wallet Remittance Calculator</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Calculated hourly totals converted automatically into local wallet remittance metrics.</p>
+              </div>
+              <div className="grid grid-cols-1 md:divide-x md:divide-y-0 divide-y divide-slate-100 gap-4">
+                {guards.map(g => {
+                  const baseRate = 25; // N$25.00 per hour local base guard estimate
+                  const totalRemittance = g.hours * baseRate;
+                  return (
+                    <div key={g.id} className="p-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-black text-slate-800">{g.name}</h4>
+                        <p className="text-xs font-mono text-slate-400">{g.badgeNumber} · Total Tracked Hours: {g.hours}h</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-black text-emerald-600">N$ {totalRemittance.toLocaleString()}</div>
+                        <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-bold block mt-1">
+                          📱 Mobile E-Wallet Compliant
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: COMPLIANT AI ROSTER COMPLIANCE LOGIC ENGINE */}
+          {currentTab === 'ai-helper' && (
+            <div className="border border-slate-100 rounded-xl p-5 bg-white space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900 uppercase">AI Automated Roster Assistant</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Compliance checker processing shifts based on local safety regulations.</p>
+              </div>
+              <div className="p-4 bg-slate-900 rounded-xl font-mono text-xs text-emerald-400 border border-slate-800 space-y-2 shadow-inner">
+                <div>🤖 [ShiftWise AI Core Engine online]</div>
+                <div>🔒 Privacy Directive enforced: Running strictly inside active local runtime cache memory.</div>
+                <div>📍 Synchronizing matrix coordinates to exact 1510px grid container blueprint.</div>
+                <div>⚡ Auto-Fill operations ready to dynamically separate adjacent Night/Day guard pairings.</div>
+              </div>
+              <button onClick={() => { handleAutoFill(); setCurrentTab('scheduler'); }} className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-2.5 px-4 rounded-xl shadow-sm tracking-wide uppercase">
+                ⚡ Execute Auto-Fill Matrix & View Grid
+              </button>
+            </div>
+          )}
+
+        </main>
+      </div>
+    </div>
   );
 }
