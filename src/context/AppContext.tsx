@@ -613,17 +613,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const isIframe = window.self !== window.top;
       if (isIframe) {
-        console.log("Iframe environment detected. Preparing popup login with redirect fallback.");
+        console.log("Iframe environment detected. Preparing popup login with quick timeout and redirect fallback.");
       }
 
       try {
         console.log("Attempting smooth Google sign-in via signInWithPopup...");
-        const cred = await signInWithPopup(auth, provider);
+        
+        // Race the signInWithPopup call against a 9-second timeout to prevent iframe/COOP-induced loading hangs
+        const popupPromise = signInWithPopup(auth, provider);
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error("auth/popup-timeout")), 9000)
+        );
+
+        const cred = await Promise.race([popupPromise, timeoutPromise]);
         await handleAuthenticatedUserCredential(cred);
       } catch (popupErr: any) {
-        const errorCode = popupErr.code || "";
-        const errorMessage = popupErr.message || "";
-        console.warn(`signInWithPopup was blocked/cancelled (code: ${errorCode}, message: ${errorMessage}). Checking if user is actually authenticated...`, popupErr);
+        const errorCode = popupErr.code || popupErr.message || "";
+        const errorMessage = popupErr.message || String(popupErr);
+        console.warn(`signInWithPopup was blocked, timed out, or cancelled (code: ${errorCode}, message: ${errorMessage}). Checking if user is actually authenticated...`, popupErr);
         
         // Failsafe check: if the user actually authenticated despite the popup error/COOP block
         let currentUser = auth.currentUser;
@@ -648,13 +655,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           errorCode === "auth/popup-blocked" || 
           errorCode === "auth/popup-closed-by-user" || 
           errorCode === "auth/cancelled-popup-request" ||
+          errorCode === "auth/popup-timeout" ||
           errorMessage.toLowerCase().includes("closed") ||
           errorMessage.toLowerCase().includes("block") ||
           errorMessage.toLowerCase().includes("coop") ||
+          errorMessage.toLowerCase().includes("timeout") ||
           errorMessage.toLowerCase().includes("cross-origin-opener-policy");
 
         if (isPopupConstraint) {
-          console.warn("Popup blocked or COOP constraint. Triggering fallback page redirection...");
+          console.warn("Popup blocked, timed out or COOP constraint. Triggering fallback page redirection...");
           await signInWithRedirect(auth, provider);
         } else {
           // Rethrow genuine configuration or account errors
