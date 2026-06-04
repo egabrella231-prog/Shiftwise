@@ -94,6 +94,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; time: string; read: boolean }>>([
     { id: '1', text: 'Welcome to ShiftWise Namibia! 🇳🇦 Customize your settings and create your first site and employees.', time: 'Just now', read: false }
   ]);
@@ -140,20 +141,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  // Listen to Auth State
+  // Listen to Auth State (Runs strictly on mount only)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
         if (isAuthTransitioning.current) {
           // Skip auto-loading during registration/SSO profile building to avoid prematurely setting demo_company
+          setIsAuthReady(true);
           setLoading(false);
           return;
         }
         try {
-          await loadUserProfileAndCompany(user.uid);
+          // Failsafe 5-second timeout for the initial Firestore profile loading to avoid freezing
+          const loadPromise = loadUserProfileAndCompany(user.uid);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout loading profile")), 5000)
+          );
+          await Promise.race([loadPromise, timeoutPromise]);
         } catch (error) {
-          console.error("Auth state change load error:", error);
+          console.error("Auth state change load error, falling back to local demo configuration to prevent locking:", error);
+          // Auto fall back to demo company if the connection fails or times out
+          setUserProfile({
+            id: user.uid,
+            company_id: "demo_company",
+            name: user.displayName || "Admin User",
+            email: user.email || "",
+            role: "admin"
+          });
+          await loadCompanyData("demo_company").catch(e => console.error(e));
         }
       } else {
         setUserProfile(null);
@@ -163,19 +179,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setPayrollSettings(null);
         setRosters({});
       }
+      setIsAuthReady(true);
       setLoading(false);
     });
 
-    // Failsafe backup timer to guarantee the app starts up even under network or COOP restrictions
+    // Failsafe backup timer to guarantee the app starts up even under network, cloud, or COOP restrictions
     const backupTimer = setTimeout(() => {
+      console.warn("Failsafe backup timer triggered. Activating app UI layer.");
+      setIsAuthReady(true);
       setLoading(false);
-    }, 3000);
+    }, 3500);
 
     return () => {
       unsubscribe();
       clearTimeout(backupTimer);
     };
-  }, [currentMonth]);
+  }, []);
+
+  // Separate effect to load/refresh company data when the selected month changes
+  useEffect(() => {
+    if (firebaseUser && userProfile?.company_id) {
+      setLoading(true);
+      loadCompanyData(userProfile.company_id)
+        .catch(err => console.error("Error loading company data on month change:", err))
+        .finally(() => setLoading(false));
+    }
+  }, [currentMonth, firebaseUser, userProfile?.company_id]);
 
   // Load User details and Company Roster
   const loadUserProfileAndCompany = async (uid: string) => {
@@ -577,20 +606,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      // Force selection of account
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      const isIframe = window.self !== window.top;
+      if (isIframe) {
+        console.log("Iframe environment detected. Preparing popup login with redirect fallback.");
+      }
+
       try {
         console.log("Attempting smooth Google sign-in via signInWithPopup...");
         const cred = await signInWithPopup(auth, provider);
         await handleAuthenticatedUserCredential(cred);
       } catch (popupErr: any) {
         const errorCode = popupErr.code || "";
-        console.warn(`signInWithPopup was blocked/cancelled (code: ${errorCode}). Checking if user is actually authenticated...`, popupErr);
+        const errorMessage = popupErr.message || "";
+        console.warn(`signInWithPopup was blocked/cancelled (code: ${errorCode}, message: ${errorMessage}). Checking if user is actually authenticated...`, popupErr);
         
         // Failsafe check: if the user actually authenticated despite the popup error/COOP block
         let currentUser = auth.currentUser;
         if (!currentUser) {
           // Wait for a few milliseconds to allow the auth listener to receive the token
-          for (let i = 0; i < 5; i++) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+          for (let i = 0; i < 8; i++) {
+            await new Promise(resolve => setTimeout(resolve, 250));
             if (auth.currentUser) {
               currentUser = auth.currentUser;
               break;
@@ -608,18 +648,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           errorCode === "auth/popup-blocked" || 
           errorCode === "auth/popup-closed-by-user" || 
           errorCode === "auth/cancelled-popup-request" ||
-          popupErr.message?.toLowerCase().includes("closed") ||
-          popupErr.message?.toLowerCase().includes("block");
+          errorMessage.toLowerCase().includes("closed") ||
+          errorMessage.toLowerCase().includes("block") ||
+          errorMessage.toLowerCase().includes("coop") ||
+          errorMessage.toLowerCase().includes("cross-origin-opener-policy");
 
         if (isPopupConstraint) {
-          // Bypasses the iframe sandboxing popup block by executing direct page redirection
+          console.warn("Popup blocked or COOP constraint. Triggering fallback page redirection...");
           await signInWithRedirect(auth, provider);
         } else {
           // Rethrow genuine configuration or account errors
           throw popupErr;
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Google login failure:", err);
       throw err;
     } finally {
@@ -921,7 +963,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       loading,
       
       user: userProfile,
-      isAuthReady: !loading,
+      isAuthReady,
       
       setTheme,
       setCurrentMonth,

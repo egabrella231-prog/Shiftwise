@@ -47,8 +47,25 @@ export default function Login({ onRegisterRedirect }: { onRegisterRedirect: () =
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      console.error(err);
-      setError("Google Login failed or was cancelled. Sharp sharp! Give it another try.");
+      console.error("Google Sign-In error caught in page:", err);
+      const rawMessage = err?.message || String(err);
+      if (
+        rawMessage.toLowerCase().includes("opener") || 
+        rawMessage.toLowerCase().includes("coop") || 
+        rawMessage.toLowerCase().includes("popup") ||
+        rawMessage.toLowerCase().includes("block") ||
+        rawMessage.toLowerCase().includes("closed")
+      ) {
+        setError(
+          "Awe my friend! 🇳🇦 Your browser blocked the Google Sign-In popup due to a sandboxed iframe context or Cross-Origin-Opener-Policy (COOP) header restriction.\n\n" +
+          "How to resolve this instantly:\n" +
+          "1. Click the 'Open in New Tab' icon in the top-right corner of Google AI Studio to launch خارج sandbox constraints, or\n" +
+          "2. Click the 'Load Admin Demo' or 'Load Supervisor Demo' buttons below for instant Sandbox access without needing Google Sign-In!\n\n" +
+          `Technical Info: ${rawMessage}`
+        );
+      } else {
+        setError(`Google login error: ${rawMessage}. Please try again, or use Quick Demo access below! Sharp sharp!`);
+      }
     } finally {
       setLoading(false);
     }
