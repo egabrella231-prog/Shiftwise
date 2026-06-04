@@ -6,9 +6,9 @@ const TRIAL_START_KEY = 'shiftwise_trial_start_epoch';
 const PREMIUM_LICENSE_KEY = 'shiftwise_premium_unlocked';
 
 export const useShiftWiseLicensing = () => {
-  const { user, company } = useApp();
+  const { user, company, firebaseUser } = useApp();
 
-  const isPremiumEmail = user?.email === 'egabrella231@gmail.com';
+  const isPremiumEmail = user?.email === 'egabrella231@gmail.com' || firebaseUser?.email === 'egabrella231@gmail.com';
   const isPremiumMetadata = 
     company?.plan === 'business' || 
     company?.plan === 'enterprise' || 
@@ -21,7 +21,8 @@ export const useShiftWiseLicensing = () => {
     return localStorage.getItem(PREMIUM_LICENSE_KEY) === 'true';
   });
 
-  const isPremium = isPremiumEmail || isPremiumMetadata || isPremiumLocal;
+  const hasPayrollAccess = isPremiumEmail || isPremiumMetadata || isPremiumLocal;
+  const isPremium = hasPayrollAccess;
 
   const [trialStatus, setTrialStatus] = useState<{
     isActive: boolean;
@@ -57,7 +58,7 @@ export const useShiftWiseLicensing = () => {
     setIsPremiumLocal(true);
   };
 
-  return { isPremium, trialStatus, activatePremiumLocally };
+  return { isPremium, hasPayrollAccess, trialStatus, activatePremiumLocally };
 };
 
 interface PaywallLockProps {

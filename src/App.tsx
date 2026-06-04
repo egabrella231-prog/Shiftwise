@@ -32,7 +32,7 @@ function DashboardShell() {
     setSelectedSiteId 
   } = useApp();
 
-  const { isPremium, trialStatus } = useShiftWiseLicensing();
+  const { isPremium, hasPayrollAccess, trialStatus } = useShiftWiseLicensing();
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [unreadCount, setUnreadCount] = useState(notifications.length);
@@ -314,7 +314,7 @@ function DashboardShell() {
               featureName="Payroll Advisory Calculator"
               isLockedByExpiry={trialStatus.hasExpired}
               isPremiumFeature={true}
-              isPremiumUser={isPremium}
+              isPremiumUser={hasPayrollAccess}
             >
               <PayrollCalculator />
             </PaywallLockView>

@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser
@@ -115,6 +117,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
+  // Match the redirect trigger authentication if the app returns from a Google OAuth sign-in redirect
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (cred) => {
+        if (cred?.user) {
+          console.log("Got query credential result from Google redirect, logging in...");
+          isAuthTransitioning.current = true;
+          setLoading(true);
+          try {
+            await handleAuthenticatedUserCredential(cred);
+          } catch (err) {
+            console.error("Error logging in via Google redirect:", err);
+          } finally {
+            isAuthTransitioning.current = false;
+            setLoading(false);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Get redirect result failed:", err);
+      });
+  }, []);
+
   // Listen to Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -122,6 +147,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         if (isAuthTransitioning.current) {
           // Skip auto-loading during registration/SSO profile building to avoid prematurely setting demo_company
+          setLoading(false);
           return;
         }
         try {
@@ -140,7 +166,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Failsafe backup timer to guarantee the app starts up even under network or COOP restrictions
+    const backupTimer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(backupTimer);
+    };
   }, [currentMonth]);
 
   // Load User details and Company Roster
@@ -492,55 +526,101 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await registerWithEmail(email, password, companyName, companyLogo, fullName, 'admin');
   };
 
-  // Google Login
+  // Shared handler for authenticated Google login credential payload processing
+  const handleAuthenticatedUserCredential = async (cred: any) => {
+    if (!cred?.user) return;
+    
+    const profileRef = doc(db, 'users', cred.user.uid);
+    const profileSnap = await getDoc(profileRef);
+    
+    if (!profileSnap.exists()) {
+      const companyId = "comp_" + Date.now().toString();
+      const compDocRef = doc(db, 'companies', companyId);
+      
+      const newCompany: Company = {
+        id: companyId,
+        name: (cred.user.displayName || "My Security") + " Corp",
+        logo_url: cred.user.photoURL || "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=200",
+        plan: 'starter',
+        created_at: new Date().toISOString()
+      };
+      await setDoc(compDocRef, newCompany);
+
+      const newProfile: UserProfile = {
+        id: cred.user.uid,
+        company_id: companyId,
+        name: cred.user.displayName || "Google User",
+        email: cred.user.email || "",
+        role: 'admin',
+        phone: ""
+      };
+      await setDoc(profileRef, newProfile);
+
+      setCompany(newCompany);
+      setUserProfile(newProfile);
+      await loadCompanyData(companyId);
+    } else {
+      const existingProfile = profileSnap.data() as UserProfile;
+      setUserProfile(existingProfile);
+
+      const compDocSnap = await getDoc(doc(db, 'companies', existingProfile.company_id));
+      if (compDocSnap.exists()) {
+        setCompany(compDocSnap.data() as Company);
+      }
+      await loadCompanyData(existingProfile.company_id);
+    }
+  };
+
+  // Google Login with automatic direct sandbox iframe fallback to signInWithRedirect
   const loginWithGoogle = async () => {
     isAuthTransitioning.current = true;
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const cred = await signInWithPopup(auth, provider);
-      
-      // Look up profile
-      const profileRef = doc(db, 'users', cred.user.uid);
-      const profileSnap = await getDoc(profileRef);
-      
-      if (!profileSnap.exists()) {
-        const companyId = "comp_" + Date.now().toString();
-        const compDocRef = doc(db, 'companies', companyId);
+      try {
+        console.log("Attempting smooth Google sign-in via signInWithPopup...");
+        const cred = await signInWithPopup(auth, provider);
+        await handleAuthenticatedUserCredential(cred);
+      } catch (popupErr: any) {
+        const errorCode = popupErr.code || "";
+        console.warn(`signInWithPopup was blocked/cancelled (code: ${errorCode}). Checking if user is actually authenticated...`, popupErr);
         
-        const newCompany: Company = {
-          id: companyId,
-          name: (cred.user.displayName || "My Security") + " Corp",
-          logo_url: cred.user.photoURL || "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=200",
-          plan: 'starter',
-          created_at: new Date().toISOString()
-        };
-        await setDoc(compDocRef, newCompany);
-
-        const newProfile: UserProfile = {
-          id: cred.user.uid,
-          company_id: companyId,
-          name: cred.user.displayName || "Google User",
-          email: cred.user.email || "",
-          role: 'admin',
-          phone: ""
-        };
-        await setDoc(profileRef, newProfile);
-
-        setCompany(newCompany);
-        setUserProfile(newProfile);
-        await loadCompanyData(companyId);
-      } else {
-        const existingProfile = profileSnap.data() as UserProfile;
-        setUserProfile(existingProfile);
-
-        const compDocSnap = await getDoc(doc(db, 'companies', existingProfile.company_id));
-        if (compDocSnap.exists()) {
-          setCompany(compDocSnap.data() as Company);
+        // Failsafe check: if the user actually authenticated despite the popup error/COOP block
+        let currentUser = auth.currentUser;
+        if (!currentUser) {
+          // Wait for a few milliseconds to allow the auth listener to receive the token
+          for (let i = 0; i < 5; i++) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            if (auth.currentUser) {
+              currentUser = auth.currentUser;
+              break;
+            }
+          }
         }
-        await loadCompanyData(existingProfile.company_id);
+        
+        if (currentUser) {
+          console.log("User is authenticated! Proceeding with credentials recovery for", currentUser.email);
+          await handleAuthenticatedUserCredential({ user: currentUser });
+          return;
+        }
+
+        const isPopupConstraint = 
+          errorCode === "auth/popup-blocked" || 
+          errorCode === "auth/popup-closed-by-user" || 
+          errorCode === "auth/cancelled-popup-request" ||
+          popupErr.message?.toLowerCase().includes("closed") ||
+          popupErr.message?.toLowerCase().includes("block");
+
+        if (isPopupConstraint) {
+          // Bypasses the iframe sandboxing popup block by executing direct page redirection
+          await signInWithRedirect(auth, provider);
+        } else {
+          // Rethrow genuine configuration or account errors
+          throw popupErr;
+        }
       }
     } catch (err) {
+      console.error("Google login failure:", err);
       throw err;
     } finally {
       isAuthTransitioning.current = false;
