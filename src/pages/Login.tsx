@@ -25,12 +25,16 @@ export default function Login({ onRegisterRedirect }: { onRegisterRedirect: () =
     try {
       await loginWithEmail(email, password);
     } catch (err: any) {
-      console.error(err);
-      if (err.message?.includes('not-found') || err.message?.includes('invalid-credential') || err.message?.includes('wrong-password')) {
-        setError("Invalid email or password. To bypass, please click the 'Load Quick Demo User' button below!");
+      console.error("Login Error details:", err);
+      const errorCode = err.code || "";
+      const rawMessage = err.message || "";
+      
+      if (errorCode === 'auth/operation-not-allowed' || rawMessage.includes('operation-not-allowed')) {
+        setError("The Email/Password provider is disabled in your Firebase Console. Under your project (admission-2), go to Authentication -> Sign-in Method, and enable 'Email/Password'. Alternatively, use the 'Load Quick Demo User' button below or use Google Sign-In!");
+      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential' || rawMessage.includes('user-not-found') || rawMessage.includes('wrong-password') || rawMessage.includes('invalid-credential')) {
+        setError("Invalid email or password. Under this live database, your account must be registered first. Feel free to use the 'Register here' link, click a Quick Demo User preset below, or sign in via Google! Sharp sharp!");
       } else {
-        // Fallback for demo environments: if authentication fails due to unconfigured email auth, let's create a mockup or show guide
-        setError("Firebase Email provider needs to be activated in your Firebase console. For now, please use the 'Sign in with Google' option or double-check details! Awe!");
+        setError(`Firebase Authentication Error: ${rawMessage || "Check network/credentials."} (Code: ${errorCode || "unknown"}). To test instantly, use a Quick Demo preset below!`);
       }
     } finally {
       setLoading(false);

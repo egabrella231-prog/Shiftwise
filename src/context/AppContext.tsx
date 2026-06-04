@@ -24,6 +24,7 @@ import {
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Company, UserProfile, Employee, Site, PayrollSettings, Roster, ShiftType } from '../types';
 import { isNamibianPublicHoliday } from '../lib/holidays';
+import { useLocalFirstRoster } from '../hooks/useLocalFirstRoster';
 
 interface AppContextType {
   firebaseUser: FirebaseUser | null;
@@ -72,18 +73,20 @@ interface AppContextType {
   saveRosterDoc: (employeeId: string, shifts: { [day: string]: ShiftType }) => Promise<void>;
 
   refreshAllData: () => Promise<void>;
+  clearRostersCached: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const isAuthTransitioning = React.useRef(false);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings | null>(null);
-  const [rosters, setRosters] = useState<{ [employeeId: string]: Roster }>({});
+  const [rosters, setRosters, clearRostersCached] = useLocalFirstRoster<{ [employeeId: string]: Roster }>({});
   
   const [currentMonth, setCurrentMonth] = useState<string>("2026-06");
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
@@ -117,6 +120,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
+        if (isAuthTransitioning.current) {
+          // Skip auto-loading during registration/SSO profile building to avoid prematurely setting demo_company
+          return;
+        }
         try {
           await loadUserProfileAndCompany(user.uid);
         } catch (error) {
@@ -187,51 +194,179 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loadCompanyData = async (companyId: string) => {
     try {
       // Employees
-      const empQuery = query(collection(db, "companies", companyId, "employees"));
-      const empSnap = await getDocs(empQuery);
-      const tempEmployees: Employee[] = [];
-      empSnap.forEach(d => {
-        tempEmployees.push({ ...d.data(), id: d.id } as Employee);
-      });
-      setEmployees(tempEmployees);
+      let tempEmployees: Employee[] = [];
+      try {
+        const empQuery = query(collection(db, "companies", companyId, "employees"));
+        const empSnap = await getDocs(empQuery);
+        empSnap.forEach(d => {
+          tempEmployees.push({ ...d.data(), id: d.id } as Employee);
+        });
+      } catch (e) {
+        console.warn("Could not load employees from Firestore. Falling back to local data if demo.", e);
+      }
 
       // Sites
-      const siteQuery = query(collection(db, "companies", companyId, "sites"));
-      const siteSnap = await getDocs(siteQuery);
-      const tempSites: Site[] = [];
-      siteSnap.forEach(d => {
-        tempSites.push({ ...d.data(), id: d.id } as Site);
-      });
+      let tempSites: Site[] = [];
+      try {
+        const siteQuery = query(collection(db, "companies", companyId, "sites"));
+        const siteSnap = await getDocs(siteQuery);
+        siteSnap.forEach(d => {
+          tempSites.push({ ...d.data(), id: d.id } as Site);
+        });
+      } catch (e) {
+        console.warn("Could not load sites from Firestore. Falling back to local data if demo.", e);
+      }
+
+      // If this is a demo environment, or lists are completely empty, populate detailed Namibian demo datasets
+      if (companyId === "demo_company" || companyId.startsWith("demo_") || tempEmployees.length === 0) {
+        if (tempSites.length === 0) {
+          tempSites = [
+            { id: "site_windhoek", company_id: companyId, name: "Windhoek CBD Mall Security Port", location: "Independence Ave, Windhoek 🇳🇦" },
+            { id: "site_walvis", company_id: companyId, name: "Walvis Bay Harbor Gate 1", location: "General Murtala Ramat Mohammed Ave, Walvis Bay 🇳🇦" },
+            { id: "site_swakopmund", company_id: companyId, name: "Swakopmund Urano-Depot Site", location: "C34 Mine Road, Swakopmund 🇳🇦" }
+          ];
+        }
+
+        if (tempEmployees.length === 0) {
+          tempEmployees = [
+            {
+              id: "emp_johannes",
+              company_id: companyId,
+              name: "Johannes Negumbo",
+              badge: "SW-001",
+              role: "Supervisor",
+              site_id: "site_windhoek",
+              hourly_rate: 45.0,
+              phone: "+264 81 123 4567",
+              id_number: "88050601423",
+              created_at: new Date().toISOString()
+            },
+            {
+              id: "emp_alfeus",
+              company_id: companyId,
+              name: "Alfeus Kamati",
+              badge: "SW-002",
+              role: "Guard",
+              site_id: "site_walvis",
+              hourly_rate: 35.0,
+              phone: "+264 81 765 4321",
+              id_number: "92102002345",
+              created_at: new Date().toISOString()
+            },
+            {
+              id: "emp_maria",
+              company_id: companyId,
+              name: "Maria Shikongo",
+              badge: "SW-003",
+              role: "Guard",
+              site_id: "site_windhoek",
+              hourly_rate: 35.0,
+              phone: "+264 81 999 8811",
+              id_number: "95071501198",
+              created_at: new Date().toISOString()
+            },
+            {
+              id: "emp_gabriel",
+              company_id: companyId,
+              name: "Gabriel Shivute",
+              badge: "SW-004",
+              role: "Team Leader",
+              site_id: "site_swakopmund",
+              hourly_rate: 40.0,
+              phone: "+264 81 555 4422",
+              id_number: "85110200874",
+              created_at: new Date().toISOString()
+            },
+            {
+              id: "emp_elizabeth",
+              company_id: companyId,
+              name: "Elizabeth Amunyela",
+              badge: "SW-005",
+              role: "Guard",
+              site_id: "site_walvis",
+              hourly_rate: 35.0,
+              phone: "+264 81 444 3322",
+              id_number: "97123004322",
+              created_at: new Date().toISOString()
+            }
+          ];
+        }
+      }
+
+      setEmployees(tempEmployees);
       setSites(tempSites);
 
       // Payroll Settings
-      const payrollRef = doc(db, "companies", companyId, "payroll_settings", "default");
-      const payrollSnap = await getDoc(payrollRef);
-      if (payrollSnap.exists()) {
-        setPayrollSettings(payrollSnap.data() as PayrollSettings);
-      } else {
-        const defaultPayroll: PayrollSettings = {
+      try {
+        const payrollRef = doc(db, "companies", companyId, "payroll_settings", "default");
+        const payrollSnap = await getDoc(payrollRef);
+        if (payrollSnap.exists()) {
+          setPayrollSettings(payrollSnap.data() as PayrollSettings);
+        } else {
+          const defaultPayroll: PayrollSettings = {
+            company_id: companyId,
+            night_allowance: 15.0, // extra NAD per night hour
+            ot_rate: 1.5,
+            ot_threshold: 160, // standard hours
+            ph_bonus: 250 // flat public holiday worked bonus
+          };
+          try {
+            await setDoc(payrollRef, defaultPayroll);
+          } catch (se) {}
+          setPayrollSettings(defaultPayroll);
+        }
+      } catch (err) {
+        setPayrollSettings({
           company_id: companyId,
-          night_allowance: 15.0, // extra NAD per night hour
+          night_allowance: 15.0,
           ot_rate: 1.5,
-          ot_threshold: 160, // standard hours
-          ph_bonus: 250 // flat public holiday worked bonus
-        };
-        await setDoc(payrollRef, defaultPayroll);
-        setPayrollSettings(defaultPayroll);
+          ot_threshold: 160,
+          ph_bonus: 250
+        });
       }
 
       // Rosters for this month
-      const rosterQuery = query(
-        collection(db, "companies", companyId, "roster"),
-        where("month", "==", currentMonth)
-      );
-      const rosterSnap = await getDocs(rosterQuery);
       const tempRosters: { [employeeId: string]: Roster } = {};
-      rosterSnap.forEach(d => {
-        const rost = d.data() as Roster;
-        tempRosters[rost.employee_id] = rost;
-      });
+      try {
+        const rosterQuery = query(
+          collection(db, "companies", companyId, "roster"),
+          where("month", "==", currentMonth)
+        );
+        const rosterSnap = await getDocs(rosterQuery);
+        rosterSnap.forEach(d => {
+          const rost = d.data() as Roster;
+          tempRosters[rost.employee_id] = rost;
+        });
+      } catch (err) {
+        console.warn("Could not load rosters from Firestore. Generating memory-only slots.", err);
+      }
+
+      // Generate staggered shift pattern if rosters are empty
+      if (Object.keys(tempRosters).length === 0) {
+        const pattern: ('D' | 'N' | 'O')[] = ['D', 'D', 'N', 'N', 'O', 'O'];
+        const [year, month] = currentMonth.split("-").map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        tempEmployees.forEach((emp, index) => {
+          const docId = `${emp.id}_${currentMonth}`;
+          const shifts: { [day: string]: 'D' | 'N' | 'O' | 'X' | 'PH' } = {};
+          const stagger = index % pattern.length;
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            shifts[String(d)] = pattern[(d - 1 + stagger) % pattern.length];
+          }
+
+          tempRosters[emp.id] = {
+            id: docId,
+            employee_id: emp.id,
+            company_id: companyId,
+            month: currentMonth,
+            shifts,
+            updated_at: new Date().toISOString()
+          };
+        });
+      }
+
       setRosters(tempRosters);
 
     } catch (err) {
@@ -249,6 +384,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Email login
   const loginWithEmail = async (email: string, password: string) => {
+    // If it's a demo credential, completely bypass standard real Auth network requests
+    if ((email === "admin@shiftwise.com.na" || email === "supervisor@shiftwise.com.na") && password === "demo_password") {
+      setLoading(true);
+      const isSuper = email.startsWith("supervisor");
+      const demoProfile: UserProfile = {
+        id: isSuper ? "demo_supervisor_uid" : "demo_admin_uid",
+        company_id: "demo_company",
+        name: isSuper ? "Alfeus Kamati (Supervisor Demo)" : "Johannes Negumbo (Admin Demo)",
+        email: email,
+        role: isSuper ? "supervisor" : "admin",
+        phone: isSuper ? "+264 81 765 4321" : "+264 81 123 4567"
+      };
+
+      const demoComp: Company = {
+        id: "demo_company",
+        name: "Namib Guard Security Corp",
+        logo_url: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=100",
+        plan: "starter",
+        created_at: new Date().toISOString()
+      };
+
+      setCompany(demoComp);
+      setUserProfile(demoProfile);
+
+      // Attempt to record demo login state in the active DB if accessible, otherwise silent recover
+      try {
+        const demoCompRef = doc(db, 'companies', "demo_company");
+        await setDoc(demoCompRef, demoComp, { merge: true });
+
+        const userDocRef = doc(db, 'users', demoProfile.id);
+        await setDoc(userDocRef, demoProfile, { merge: true });
+      } catch (err) {
+        console.warn("Operating in local memory-only mode. Could not writing to Firestore:", err);
+      }
+
+      await loadCompanyData("demo_company");
+      setLoading(false);
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -265,6 +440,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fullName: string,
     role: 'admin' | 'supervisor'
   ) => {
+    isAuthTransitioning.current = true;
+    setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const companyId = "comp_" + Date.now().toString();
@@ -298,6 +475,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await loadCompanyData(companyId);
     } catch (err) {
       throw err;
+    } finally {
+      isAuthTransitioning.current = false;
+      setLoading(false);
     }
   };
 
@@ -314,6 +494,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Google Login
   const loginWithGoogle = async () => {
+    isAuthTransitioning.current = true;
+    setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
@@ -360,6 +542,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       throw err;
+    } finally {
+      isAuthTransitioning.current = false;
+      setLoading(false);
     }
   };
 
@@ -685,7 +870,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       executeSetDayOfWeek,
       saveRosterDoc,
 
-      refreshAllData
+      refreshAllData,
+      clearRostersCached
     }}>
       {children}
     </AppContext.Provider>

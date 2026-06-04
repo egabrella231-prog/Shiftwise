@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useShiftWiseLicensing } from '../hooks/useShiftWiseLicensing';
 import { 
   Building2, CreditCard, ShieldCheck, MapPin, Plus, Trash2, 
-  Settings as SettingsIcon, DollarSign, Clock, HelpCircle, Save 
+  Settings as SettingsIcon, DollarSign, Clock, HelpCircle, Save, Sparkles 
 } from 'lucide-react';
 
 export default function Settings() {
@@ -12,8 +13,11 @@ export default function Settings() {
     payrollSettings, 
     upsertSite, 
     removeSite, 
-    updatePayrollSettingsDoc 
+    updatePayrollSettingsDoc,
+    clearRostersCached
   } = useApp();
+
+  const { isPremium, trialStatus, activatePremiumLocally } = useShiftWiseLicensing();
 
   // Site forms
   const [siteName, setSiteName] = useState('');
@@ -56,7 +60,8 @@ export default function Settings() {
     const confirmPay = confirm(`🇳🇦 PayToday & DPO PayGate Simulation:\n\nDo you want to authorize subscription billing of N$ ${price} per month for "ShiftWise Namibia - ${planName} Plan"?`);
     if (confirmPay) {
       setIsDemoPaid(true);
-      alert(`Subscription Success! Authorization granted via PayToday APIs. Thank you for supporting Namibian tech! Sharp sharp!`);
+      activatePremiumLocally();
+      alert(`Subscription Success! Authorization granted via PayToday APIs and commercial license activated. Thank you for supporting Namibian tech! Sharp sharp!`);
     }
   };
 
@@ -200,17 +205,84 @@ export default function Settings() {
 
       {/* Col 3: Subscription & Billing options */}
       <div className="lg:col-span-1 space-y-6">
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
           <h3 className="font-bold text-gray-900 text-sm tracking-tight flex items-center gap-2">
             <CreditCard className="h-4.5 w-4.5 text-[#185FA5]" />
-            NAMIBIA SUBSCRIPTIONS & MONETIZATION
+            NAMIBIA SUBSCRIPTIONS & LICENSING
           </h3>
 
-          {/* Current plan card */}
-          <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl text-center">
-            <span className="text-[10px] bg-blue-600 text-white font-bold px-2.5 py-0.5 rounded-full select-none uppercase">Active tier</span>
-            <h4 className="text-xl font-black text-gray-900 capitalize mt-2">{currentPlan} Plan</h4>
-            <span className="text-xs text-[#185FA5] font-semibold mt-1 block">Free 30-Day Trial Active</span>
+          {/* Current plan card showing state */}
+          {isPremium ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center space-y-1 relative overflow-hidden">
+              <span className="text-[9px] bg-amber-600 text-white font-bold px-2.5 py-0.5 rounded-md select-none uppercase inline-block">👑 LICENSE ACTIVE</span>
+              <h4 className="text-base font-black text-amber-900 capitalize mt-2">Commercial Pro Plan</h4>
+              <span className="text-[10px] text-amber-700 font-bold block leading-relaxed">
+                100% Fully Activated Offline-First Workspace
+              </span>
+            </div>
+          ) : trialStatus.hasExpired ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center space-y-1">
+              <span className="text-[9px] bg-rose-600 text-white font-bold px-2.5 py-0.5 rounded-md select-none uppercase inline-block font-mono">🚨 EXPIRED</span>
+              <h4 className="text-base font-black text-rose-950 mt-2">Trial Concluded</h4>
+              <span className="text-[10px] text-rose-700 font-bold block leading-relaxed">
+                Please finalize licensing setup or authorization to unlock.
+              </span>
+            </div>
+          ) : (
+            <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl text-center space-y-1">
+              <span className="text-[9px] bg-[#185FA5] text-white font-bold px-2.5 py-0.5 rounded-md select-none uppercase inline-block">⏳ EVALUATION ACTIVE</span>
+              <h4 className="text-lg font-black text-blue-950 capitalize mt-2">{trialStatus.daysRemaining} Days Left</h4>
+              <span className="text-[10px] text-blue-700 font-semibold block leading-relaxed">
+                Evaluating physical workspace options.
+              </span>
+            </div>
+          )}
+
+          {/* Evaluation Simulator shortcuts block */}
+          <div className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl space-y-2">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+              <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+              EVALUATION CONTROLS
+            </h4>
+            <p className="text-[9px] text-slate-500 leading-relaxed">
+              Manually trigger applet state transitions to preview the robust licensing and Namibian Paywall lock overlay layout.
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  activatePremiumLocally();
+                  alert("Premium License simulation unlocked on this browser sandbox!");
+                }}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold py-1.5 px-2 rounded-lg transition"
+              >
+                Force Premium
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('shiftwise_premium_unlocked');
+                  // Move start date to past
+                  const trialExpiredSeconds = Date.now() - (32 * 24 * 60 * 60 * 1000);
+                  localStorage.setItem('shiftwise_trial_start_epoch', trialExpiredSeconds.toString());
+                  window.location.reload();
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold py-1.5 px-2 rounded-lg transition"
+              >
+                Force Expire
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('shiftwise_premium_unlocked');
+                localStorage.setItem('shiftwise_trial_start_epoch', Date.now().toString());
+                window.location.reload();
+              }}
+              className="w-full border border-gray-200 hover:bg-gray-100 text-gray-700 text-[10px] font-bold py-1 px-2 rounded-lg transition block text-center"
+            >
+              Reset to 30-Day Evaluation
+            </button>
           </div>
 
           {/* Plan selections */}
@@ -255,6 +327,30 @@ export default function Settings() {
           >
             <CreditCard className="h-4 w-4" />
             Pay via PayToday / PayGate
+          </button>
+        </div>
+
+        {/* Offline Cache Diagnostic Section */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+          <h3 className="font-bold text-gray-900 text-sm tracking-tight flex items-center gap-2">
+            <ShieldCheck className="h-4.5 w-4.5 text-[#185FA5]" />
+            OFFLINE WORKSPACE STORAGE
+          </h3>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            For local-first compliance, rosters are cached in your local hardware sandbox for offline stability and speed.
+          </p>
+
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to securely wipe the local offline roster cache? This resets local state to server defaults.")) {
+                clearRostersCached();
+                alert("Offline roster cache has been purged successfully!");
+              }
+            }}
+            className="w-full bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-xs py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Clock className="h-4 w-4" />
+            Clear Offline Roster Cache
           </button>
         </div>
       </div>

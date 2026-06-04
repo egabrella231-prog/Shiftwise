@@ -87,7 +87,7 @@ If multiple employees have similar names (e.g., Samuel vs Maria), match them cor
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.1-flash-lite",
       contents: message,
       config: {
         systemInstruction,

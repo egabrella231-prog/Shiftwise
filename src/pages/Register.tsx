@@ -32,8 +32,24 @@ export default function Register({ onLoginRedirect }: { onLoginRedirect: () => v
     try {
       await registerCompany(companyName, logoUrl, email, password, managerName);
     } catch (err: any) {
-      console.error(err);
-      setError("Registration flow requires standard Firebase Auth configurations. For sandbox use, simply back out and try Google Sign-In or Demo login presets! Sharp sharp!");
+      console.error("Registration Error details:", err);
+      const errorCode = err.code || "";
+      const rawMessage = err.message || "";
+      
+      let friendlyError = "";
+      if (errorCode === 'auth/operation-not-allowed' || rawMessage.includes('operation-not-allowed')) {
+        friendlyError = "The Email/Password sign-in provider is disabled in your Firebase Console. Under your Firebase project (admission-2), go to Authentication -> Sign-in Method, select 'Email/Password', and switch it on. Once enabled, email registration will work instantly!";
+      } else if (errorCode === 'auth/weak-password' || rawMessage.includes('weak-password') || rawMessage.includes('password-should-be')) {
+        friendlyError = "The chosen password is too weak. Security requirements of Namibian shift records and Firebase mandate that the password must be at least 6 characters long!";
+      } else if (errorCode === 'auth/email-already-in-use' || rawMessage.includes('email-already-in-use')) {
+        friendlyError = "This corporate email is already registered to a ShiftWise workspace! Please go back to the Login page and use it there, or sign up with another email.";
+      } else if (errorCode === 'auth/invalid-email' || rawMessage.includes('invalid-email')) {
+        friendlyError = "The entered Admin Email is invalid or badly formatted. Please confirm your email structure.";
+      } else {
+        friendlyError = `Firebase Authentication Error: ${rawMessage || "Unable to contact Firebase servers."} (Code: ${errorCode || "unknown"}). For sandbox use, feel free to use standard Google Sign-In or select a Demo Preset from the Login screen!`;
+      }
+      
+      setError(friendlyError);
     } finally {
       setLoading(false);
     }
